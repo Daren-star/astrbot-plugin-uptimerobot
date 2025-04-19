@@ -21,10 +21,10 @@ STATUS_MAP = {
 }
 
 @register(
-    star_name="uptimerobot_monitor", # 插件唯一名称
-    author="YourName/AI",          # 你的名字或 AI
-    description="一个用于对接 UptimeRobot API 以监控网站状态的插件", # 插件描述
-    version="1.0.0",             # 插件版本
+    "uptimerobot_monitor", # 插件唯一名称
+    "YourName/AI",          # 你的名字或 AI
+    "一个用于对接 UptimeRobot API 以监控网站状态的插件", # 插件描述
+    "1.0.0"             # 插件版本
     # repo_url="可选的仓库地址"      # 可选
 )
 class UptimeRobotPlugin(Star):
