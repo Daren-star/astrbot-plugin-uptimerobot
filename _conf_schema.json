@@ -13,7 +13,7 @@
   },
   "notification_targets": {
     "description": "通知目标列表",
-    "type": "list[string]",
+    "type": "list",
     "hint": "接收状态变更通知的目标会话 ID 列表。格式为 \"平台:ID\"，例如 \"qq:123456789\" 或 \"group:987654321\"。",
     "default": []
   }
