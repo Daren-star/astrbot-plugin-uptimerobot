@@ -123,6 +123,7 @@ class UptimeRobotPlugin(Star):
         """调用 UptimeRobot API"""
         # --- 在需要时检查和获取配置 ---
         config = self.context.get_config()
+        logger.debug(f"_call_uptimerobot_api: self.context.get_config() returned type={type(config)}, value={config}")
         if not config or not isinstance(config, dict):
             logger.error("插件配置无法通过 self.context.get_config() 获取或类型错误，无法调用 API。")
             return {"stat": "fail", "error": {"message": "Plugin configuration cannot be loaded or is invalid"}}
@@ -228,16 +229,27 @@ class UptimeRobotPlugin(Star):
         """后台轮询检查状态变化"""
         logger.info("轮询循环已启动。")
         # 首次运行时，先获取一次状态并保存，但不进行比较和通知
-        initial_response = await self._call_uptimerobot_api('getMonitors') # 调用会检查配置
-        if initial_response.get('stat') == 'ok':
-            self._write_current_states(initial_response)
-            logger.info("已获取并保存初始监控状态。")
-        else:
-            # 如果初始获取失败 (例如配置错误)，则日志记录错误，但循环仍将启动，并在每次迭代时检查配置
-            logger.error("无法获取初始监控状态，轮询将在下一个周期尝试。")
+        initial_response = None
+        initial_attempts = 3
+        for attempt in range(initial_attempts):
+             logger.info(f"尝试获取初始监控状态 (第 {attempt + 1}/{initial_attempts} 次)...")
+             initial_response = await self._call_uptimerobot_api('getMonitors')
+             if initial_response.get('stat') == 'ok':
+                 self._write_current_states(initial_response)
+                 logger.info("已成功获取并保存初始监控状态。")
+                 break # 成功获取，跳出重试循环
+             else:
+                 error_msg = initial_response.get('error', {}).get('message', '未知错误')
+                 logger.error(f"获取初始监控状态失败 (第 {attempt + 1} 次): {error_msg}")
+                 if attempt < initial_attempts - 1:
+                     wait_time = 10 # 重试前等待 10 秒
+                     logger.info(f"将在 {wait_time} 秒后重试...")
+                     await asyncio.sleep(wait_time)
+                 else:
+                     logger.error("重试次数已达上限，无法获取初始监控状态。轮询将继续，但可能缺少初始对比基准。")
 
         # 初始等待一个较短时间，以防配置尚未完全就绪
-        await asyncio.sleep(5)
+        # await asyncio.sleep(5) # Removed initial sleep
 
         while True:
             polling_interval = 60 # 默认间隔，如果配置读取失败则使用
@@ -246,6 +258,7 @@ class UptimeRobotPlugin(Star):
                 logger.debug("执行一次轮询检查...")
                 # --- 在需要时检查和获取配置 ---
                 config = self.context.get_config()
+                logger.debug(f"_polling_loop: self.context.get_config() returned type={type(config)}, value={config}")
                 if not config or not isinstance(config, dict):
                     logger.warning("无法加载插件配置或配置类型错误，跳过本次轮询。")
                     await asyncio.sleep(polling_interval) # 使用默认间隔
