@@ -237,6 +237,27 @@ class UptimeRobotPlugin(Star):
         yield event.plain_result(output_message)
         logger.info(f"已向用户 {event.get_sender_name()} 回复监控状态。")
 
+    @filter.command("test_push")
+    async def test_push(self, event: AstrMessageEvent):
+        """测试向当前会话主动发送消息"""
+        sender_session_id = event.unified_msg_origin
+        logger.info(f"收到用户 {event.get_sender_name()} 的 /test_push 请求，目标会话: {sender_session_id}")
+
+        test_message = "这是一条来自 UptimeRobot 插件的主动推送测试消息。"
+        message_list = [Plain(text=test_message)]
+
+        try:
+            sent = await self.context.send_message(sender_session_id, message_list)
+            if sent:
+                logger.info(f"已成功向 {sender_session_id} 发送测试消息。")
+                yield event.plain_result(f"已成功向您的会话 ({sender_session_id}) 发送测试消息。")
+            else:
+                logger.warning(f"发送测试消息到 {sender_session_id} 失败 (平台不支持或未找到会话)。")
+                yield event.plain_result(f"尝试向您的会话 ({sender_session_id}) 发送测试消息失败 (平台不支持或未找到会话)。")
+        except Exception as e:
+            logger.error(f"向 {sender_session_id} 发送测试消息时出错: {e}", exc_info=True)
+            yield event.plain_result(f"尝试向您的会话 ({sender_session_id}) 发送测试消息时遇到错误，请检查日志。")
+
     # --- 后台轮询任务 ---
     async def _polling_loop(self):
         """后台轮询检查状态变化"""
@@ -366,6 +387,11 @@ class UptimeRobotPlugin(Star):
                             message_list = [Plain(text=notify_message)]
 
                             for target_session_id in notification_targets:
+                                # --- 添加目标格式验证 ---
+                                if target_session_id.count(':') != 2:
+                                    logger.warning(f"无效的通知目标格式: '{target_session_id}'。期望格式为 '平台:类型:ID' (例如 'qq:private:123' 或 'qq:group:456')。已跳过此目标。")
+                                    continue
+                                # --- 格式验证结束 ---
                                 try:
                                     sent = await self.context.send_message(target_session_id, message_list)
                                     if sent:
