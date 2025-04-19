@@ -63,6 +63,29 @@ class UptimeRobotPlugin(Star):
     async def initialize(self):
         """插件初始化，启动轮询任务"""
         logger.info("UptimeRobot 插件异步初始化开始...")
+        # +++ Add config logging in initialize +++
+        try:
+             config_init = self.context.get_config()
+             logger.info(f"initialize: self.context.get_config() returned type={type(config_init)}")
+             print(f"PRINT initialize: self.context.get_config() returned type={type(config_init)}")
+             if isinstance(config_init, dict):
+                 logger.info("获取到的配置字典内容 (initialize):")
+                 print("PRINT 获取到的配置字典内容 (initialize):")
+                 if config_init:
+                     for key, value in config_init.items():
+                         logger.info(f"  key='{key}', value='{value}', type={type(value)}")
+                         print(f"  PRINT key='{key}', value='{value}', type={type(value)}")
+                 else:
+                      logger.info("  配置字典为空 {}。")
+                      print("  PRINT 配置字典为空 {}。")
+             else:
+                 logger.info(f"获取到的配置不是字典或为 None。 Value: {config_init}")
+                 print(f"PRINT 获取到的配置不是字典或为 None。 Value: {config_init}")
+        except Exception as e:
+            logger.error(f"在 initialize 中获取或打印配置时出错: {e}", exc_info=True)
+            print(f"PRINT 在 initialize 中获取或打印配置时出错: {e}")
+        # +++ End config logging +++
+
         # 注意：API Key 和其他配置的检查将在轮询循环内部或需要时进行
 
         # 将轮询任务的启动移到方法末尾
@@ -127,13 +150,17 @@ class UptimeRobotPlugin(Star):
         logger.info(f"_call_uptimerobot_api: self.context.get_config() returned type={type(config)}")
         if isinstance(config, dict):
              logger.info("获取到的配置字典内容 (_call_uptimerobot_api):")
+             print("PRINT 获取到的配置字典内容 (_call_uptimerobot_api):") # +++ Add print
              if config:
                  for key, value in config.items():
                      logger.info(f"  key='{key}', value='{value}', type={type(value)}")
+                     print(f"  PRINT key='{key}', value='{value}', type={type(value)}")
              else:
                   logger.info("  配置字典为空 {}。")
+                  print("  PRINT 配置字典为空 {}。") # +++ Add print
         else:
             logger.info(f"获取到的配置不是字典或为 None。 Value: {config}")
+            print(f"PRINT 获取到的配置不是字典或为 None。 Value: {config}") # +++ Add print
         # +++ End Enhanced Logging +++
 
         if not config or not isinstance(config, dict):
@@ -240,25 +267,16 @@ class UptimeRobotPlugin(Star):
     async def _polling_loop(self):
         """后台轮询检查状态变化"""
         logger.info("轮询循环已启动。")
-        # 首次运行时，先获取一次状态并保存，但不进行比较和通知
-        initial_response = None
-        initial_attempts = 3
-        for attempt in range(initial_attempts):
-             logger.info(f"尝试获取初始监控状态 (第 {attempt + 1}/{initial_attempts} 次)...")
-             initial_response = await self._call_uptimerobot_api('getMonitors')
-             if initial_response.get('stat') == 'ok':
-                 self._write_current_states(initial_response)
-                 logger.info("已成功获取并保存初始监控状态。")
-                 break # 成功获取，跳出重试循环
-             else:
-                 error_msg = initial_response.get('error', {}).get('message', '未知错误')
-                 logger.error(f"获取初始监控状态失败 (第 {attempt + 1} 次): {error_msg}")
-                 if attempt < initial_attempts - 1:
-                     wait_time = 10 # 重试前等待 10 秒
-                     logger.info(f"将在 {wait_time} 秒后重试...")
-                     await asyncio.sleep(wait_time)
-                 else:
-                     logger.error("重试次数已达上限，无法获取初始监控状态。轮询将继续，但可能缺少初始对比基准。")
+        # +++ Simplified initial call +++
+        logger.info("尝试获取一次初始监控状态...")
+        initial_response = await self._call_uptimerobot_api('getMonitors')
+        if initial_response.get('stat') == 'ok':
+            self._write_current_states(initial_response)
+            logger.info("初始监控状态获取成功并已保存。")
+        else:
+            error_msg = initial_response.get('error', {}).get('message', '未知 API 错误')
+            logger.error(f"获取初始监控状态失败: {error_msg}")
+        # +++ End Simplified initial call +++
 
         # 初始等待一个较短时间，以防配置尚未完全就绪
         # await asyncio.sleep(5) # Removed initial sleep
@@ -274,13 +292,17 @@ class UptimeRobotPlugin(Star):
                 logger.info(f"_polling_loop: self.context.get_config() returned type={type(config)}")
                 if isinstance(config, dict):
                     logger.info("获取到的配置字典内容 (_polling_loop):")
+                    print("PRINT 获取到的配置字典内容 (_polling_loop):") # +++ Add print
                     if config:
                         for key, value in config.items():
                             logger.info(f"  key='{key}', value='{value}', type={type(value)}")
+                            print(f"  PRINT key='{key}', value='{value}', type={type(value)}")
                     else:
                         logger.info("  配置字典为空 {}。")
+                        print("  PRINT 配置字典为空 {}。") # +++ Add print
                 else:
                     logger.info(f"获取到的配置不是字典或为 None。 Value: {config}")
+                    print(f"PRINT 获取到的配置不是字典或为 None。 Value: {config}") # +++ Add print
                 # +++ End Enhanced Logging +++
 
                 if not config or not isinstance(config, dict):
