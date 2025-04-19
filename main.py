@@ -31,7 +31,6 @@ class UptimeRobotPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.context = context
-        self.config: Optional[Dict[str, Any]] = None # 保留 self.config，由 AstrBot 填充
         self.polling_task: Optional[asyncio.Task] = None
         self.data_path: Optional[Path] = None
         self.last_monitor_states_file: Optional[Path] = None
@@ -59,16 +58,14 @@ class UptimeRobotPlugin(Star):
              logger.error(f"初始化数据目录时出错: {e}", exc_info=True)
 
 
-        logger.info("UptimeRobot 插件初始化... (配置将在需要时读取)")
-        # 注意：移除配置读取
+        logger.info("UptimeRobot 插件初始化完成。")
 
     async def initialize(self):
         """插件初始化，启动轮询任务"""
         logger.info("UptimeRobot 插件异步初始化开始...")
-        # 注意：API Key 和其他配置的检查将在轮询循环内部进行
+        # 注意：API Key 和其他配置的检查将在轮询循环内部或需要时进行
 
         # 将轮询任务的启动移到方法末尾
-        logger.info(f"配置加载状态 (initialize 末尾): {'已加载' if self.config and isinstance(self.config, dict) else '未加载或类型错误'}")
         if self.polling_task is None or self.polling_task.done():
                 self.polling_task = asyncio.create_task(self._polling_loop())
                 logger.info("轮询任务已创建并启动。")
@@ -124,15 +121,16 @@ class UptimeRobotPlugin(Star):
 
     async def _call_uptimerobot_api(self, method: str, data: dict = None) -> Dict[str, Any]:
         """调用 UptimeRobot API"""
-        # --- 在需要时检查和获取配置 --- 
-        if not self.config or not isinstance(self.config, dict):
-            logger.error("插件配置 (self.config) 未被正确加载或类型错误，无法调用 API。")
-            return {"stat": "fail", "error": {"message": "Plugin configuration error"}}
-        
-        api_key = self.config.get('api_key')
-        if not api_key:
-            logger.error("API Key 未在插件配置中设置或为空，无法调用 UptimeRobot API。")
-            return {"stat": "fail", "error": {"message": "API Key not configured in plugin"}}
+        # --- 在需要时检查和获取配置 ---
+        config = self.context.get_config()
+        if not config or not isinstance(config, dict):
+            logger.error("插件配置无法通过 self.context.get_config() 获取或类型错误，无法调用 API。")
+            return {"stat": "fail", "error": {"message": "Plugin configuration cannot be loaded or is invalid"}}
+
+        api_key = config.get('api_key')
+        if not api_key or not isinstance(api_key, str) or not api_key.strip():
+             logger.error("API Key 未在插件配置中设置、为空或类型错误，无法调用 UptimeRobot API。")
+             return {"stat": "fail", "error": {"message": "API Key not configured correctly in plugin"}}
         # --- 配置检查结束 ---
 
         api_url = f"https://api.uptimerobot.com/v2/{method}"
@@ -180,18 +178,22 @@ class UptimeRobotPlugin(Star):
     @filter.command("uptime_status")
     async def uptime_status(self, event: AstrMessageEvent):
         """获取并显示当前 UptimeRobot 监控状态"""
-        # --- 在需要时检查和获取配置 --- 
-        if not self.config or not isinstance(self.config, dict):
-            yield event.plain_result("错误：插件配置未正确加载或类型错误。")
-            return
-        api_key = self.config.get('api_key')
-        if not api_key:
-            yield event.plain_result("错误：UptimeRobot API Key 未在插件配置中设置。请在 AstrBot UI 中配置。")
+        # --- 在需要时检查和获取配置 ---
+        config = self.context.get_config()
+        if not config or not isinstance(config, dict):
+             yield event.plain_result("错误：无法加载插件配置。请检查 AstrBot 配置或日志。")
+             logger.error("无法获取插件配置 (uptime_status)。")
+             return
+
+        api_key = config.get('api_key')
+        if not api_key or not isinstance(api_key, str) or not api_key.strip():
+            yield event.plain_result("错误：UptimeRobot API Key 未在插件配置中正确设置。请在 AstrBot UI 中配置。")
+            logger.error("未找到或无效的 API Key (uptime_status)。")
             return
         # --- 配置检查结束 ---
 
         logger.info(f"收到用户 {event.get_sender_name()} 的 /uptime_status 请求。")
-        # API 调用会自动检查 api_key
+        # API 调用会自动检查 api_key (通过 _call_uptimerobot_api 内部的逻辑)
         api_response = await self._call_uptimerobot_api('getMonitors')
 
         if api_response.get('stat') == 'fail':
@@ -233,42 +235,43 @@ class UptimeRobotPlugin(Star):
         else:
             # 如果初始获取失败 (例如配置错误)，则日志记录错误，但循环仍将启动，并在每次迭代时检查配置
             logger.error("无法获取初始监控状态，轮询将在下一个周期尝试。")
-        
-        # 首次等待使用默认值或从配置读取(如果可用)
-        initial_interval = 60
-        if self.config and isinstance(self.config, dict):
-            initial_interval = self.config.get('polling_interval', 60)
-            try: initial_interval = int(initial_interval) 
-            except: initial_interval = 60
-            if initial_interval < 10: initial_interval = 10
-        await asyncio.sleep(initial_interval) # 等待第一个间隔
+
+        # 初始等待一个较短时间，以防配置尚未完全就绪
+        await asyncio.sleep(5)
 
         while True:
-            polling_interval = 60 # 默认间隔
+            polling_interval = 60 # 默认间隔，如果配置读取失败则使用
+            config = None # 重置配置变量
             try:
-                logger.debug("执行一次轮询检查...") 
-                # --- 在需要时检查和获取配置 --- 
-                if not self.config or not isinstance(self.config, dict):
-                    logger.warning("插件配置未正确加载或类型错误，跳过本次轮询。")
-                    await asyncio.sleep(polling_interval) # 使用默认间隔休眠
+                logger.debug("执行一次轮询检查...")
+                # --- 在需要时检查和获取配置 ---
+                config = self.context.get_config()
+                if not config or not isinstance(config, dict):
+                    logger.warning("无法加载插件配置或配置类型错误，跳过本次轮询。")
+                    await asyncio.sleep(polling_interval) # 使用默认间隔
                     continue
-                
-                api_key = self.config.get('api_key')
-                if not api_key:
-                     logger.warning("API Key 未在插件配置中设置，跳过本次轮询。")
-                     # 读取轮询间隔用于休眠
-                     try: polling_interval = int(self.config.get('polling_interval', 60))
-                     except: polling_interval = 60
-                     if polling_interval < 10: polling_interval = 10
-                     await asyncio.sleep(polling_interval)
-                     continue
-                 
+
+                api_key = config.get('api_key')
+                if not api_key or not isinstance(api_key, str) or not api_key.strip():
+                    logger.warning("API Key 未在插件配置中正确设置，跳过本次轮询。")
+                    # 尝试读取轮询间隔用于休眠
+                    try: polling_interval = int(config.get('polling_interval', 60))
+                    except (ValueError, TypeError): polling_interval = 60
+                    if polling_interval < 10: polling_interval = 10
+                    await asyncio.sleep(polling_interval)
+                    continue
+
                 # 读取当前轮询间隔 (每次循环都读，允许动态修改)
-                try: polling_interval = int(self.config.get('polling_interval', 60))
-                except: polling_interval = 60
-                if polling_interval < 10: polling_interval = 10
+                try:
+                    polling_interval = int(config.get('polling_interval', 60))
+                except (ValueError, TypeError):
+                    logger.warning(f"配置中的 polling_interval 值无效，使用默认值 60。原始值: {config.get('polling_interval')}")
+                    polling_interval = 60
+                if polling_interval < 10:
+                    logger.warning(f"配置的 polling_interval ({polling_interval}) 小于最小值 10，将使用 10。")
+                    polling_interval = 10
                 # --- 配置检查结束 ---
-                 
+
                 # 获取当前状态 (API 调用会使用检查过的 api_key)
                 current_response = await self._call_uptimerobot_api('getMonitors')
                 if current_response.get('stat') != 'ok':
@@ -311,13 +314,19 @@ class UptimeRobotPlugin(Star):
                     
                 # 发送通知
                 if changed_monitors:
-                    # --- 在需要时获取配置 --- 
-                    notification_targets = self.config.get('notification_targets', [])
-                    if isinstance(targets, list):
-                         notification_targets = [str(t) for t in targets if isinstance(t, (str, int))]
+                    # --- 在需要时获取配置 ---
+                    notification_targets = [] # Default to empty list
+                    if config: # Ensure config was loaded successfully earlier in the loop
+                        targets_from_config = config.get('notification_targets', [])
+                        if isinstance(targets_from_config, list):
+                            # 过滤并转换为字符串
+                            notification_targets = [str(t).strip() for t in targets_from_config if isinstance(t, (str, int)) and str(t).strip()]
+                            # 移除空字符串目标
+                            notification_targets = [t for t in notification_targets if t]
+                        else:
+                            logger.warning(f"配置中的 notification_targets 不是列表 (类型: {type(targets_from_config)})，本次不发送通知。")
                     else:
-                         logger.warning("配置中的 notification_targets 不是列表，本次不发送通知。")
-                         notification_targets = []
+                         logger.warning("配置未加载，无法获取 notification_targets，本次不发送通知。")
                     # --- 配置获取结束 ---
 
                     if notification_targets:
@@ -352,7 +361,8 @@ class UptimeRobotPlugin(Star):
                 await asyncio.sleep(5)
             finally:
                 # 确保即使出错也有休眠，防止CPU空转
-                # 使用在 try 块开始时获取的 polling_interval
+                # 使用在 try 块开始时获取的 polling_interval (或默认值)
+                # logger.debug(f"轮询结束，等待 {polling_interval} 秒...") # 调试时可取消注释
                 await asyncio.sleep(polling_interval)
         logger.info("轮询循环已结束。")
 
