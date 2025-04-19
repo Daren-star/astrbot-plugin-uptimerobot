@@ -2,7 +2,7 @@ import asyncio
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from astrbot.api.message_components import MessageChain, Plain # 导入消息链和纯文本组件
+from astrbot.api.message_components import Plain # 导入消息链和纯文本组件
 
 # 第三方库
 import requests
@@ -320,7 +320,7 @@ class UptimeRobotPlugin(Star):
                         old_status_desc = self._get_status_description(change['old_status'])
                         new_status_desc = self._get_status_description(change['new_status'])
                         notify_message = f"【UptimeRobot 状态变更】\n监控项: {change['name']}\n状态: {old_status_desc} -> {new_status_desc}"
-                        message_chain = MessageChain([Plain(text=notify_message)])
+                        message_list = [Plain(text=notify_message)] # Create list directly
 
                         for target_session_id in self.notification_targets:
                             try:
@@ -328,7 +328,7 @@ class UptimeRobotPlugin(Star):
                                 # 如果它是同步的，需要用 await asyncio.to_thread(self.context.send_message, ...) 
                                 # 查阅 Context 文档确认 send_message 是否 awaitable
                                 # 假设它是异步的：
-                                sent = await self.context.send_message(target_session_id, message_chain)
+                                sent = await self.context.send_message(target_session_id, message_list) # Pass the list
                                 if sent:
                                      logger.info(f"已成功向 {target_session_id} 发送通知: {change['name']}")
                                 else:
