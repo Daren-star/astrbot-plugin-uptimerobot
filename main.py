@@ -33,15 +33,15 @@ PLUGIN_NAME = "uptimerobot_monitor"
 class UptimeRobotPlugin(Star):
     PLUGIN_NAME = "uptimerobot_monitor"  # 定义插件名称常量
 
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: dict):
         super().__init__(context)
+        self.plugin_config = config
         self.context = context
         self.polling_task: Optional[asyncio.Task] = None
         self.data_path: Optional[Path] = None
         self.last_monitor_states_file: Optional[Path] = None
 
         # 获取插件专属配置
-        self.plugin_config = self.context.get_plugin_config(self.PLUGIN_NAME)
         logger.info(f"插件配置加载: {self.plugin_config}")
 
         # 设置数据目录 (保留回退逻辑)
