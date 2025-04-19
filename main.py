@@ -123,7 +123,19 @@ class UptimeRobotPlugin(Star):
         """调用 UptimeRobot API"""
         # --- 在需要时检查和获取配置 ---
         config = self.context.get_config()
-        logger.debug(f"_call_uptimerobot_api: self.context.get_config() returned type={type(config)}, value={config}")
+        # +++ Enhanced INFO Logging +++
+        logger.info(f"_call_uptimerobot_api: self.context.get_config() returned type={type(config)}")
+        if isinstance(config, dict):
+             logger.info("获取到的配置字典内容 (_call_uptimerobot_api):")
+             if config:
+                 for key, value in config.items():
+                     logger.info(f"  key='{key}', value='{value}', type={type(value)}")
+             else:
+                  logger.info("  配置字典为空 {}。")
+        else:
+            logger.info(f"获取到的配置不是字典或为 None。 Value: {config}")
+        # +++ End Enhanced Logging +++
+
         if not config or not isinstance(config, dict):
             logger.error("插件配置无法通过 self.context.get_config() 获取或类型错误，无法调用 API。")
             return {"stat": "fail", "error": {"message": "Plugin configuration cannot be loaded or is invalid"}}
@@ -258,7 +270,19 @@ class UptimeRobotPlugin(Star):
                 logger.debug("执行一次轮询检查...")
                 # --- 在需要时检查和获取配置 ---
                 config = self.context.get_config()
-                logger.debug(f"_polling_loop: self.context.get_config() returned type={type(config)}, value={config}")
+                # +++ Enhanced INFO Logging +++
+                logger.info(f"_polling_loop: self.context.get_config() returned type={type(config)}")
+                if isinstance(config, dict):
+                    logger.info("获取到的配置字典内容 (_polling_loop):")
+                    if config:
+                        for key, value in config.items():
+                            logger.info(f"  key='{key}', value='{value}', type={type(value)}")
+                    else:
+                        logger.info("  配置字典为空 {}。")
+                else:
+                    logger.info(f"获取到的配置不是字典或为 None。 Value: {config}")
+                # +++ End Enhanced Logging +++
+
                 if not config or not isinstance(config, dict):
                     logger.warning("无法加载插件配置或配置类型错误，跳过本次轮询。")
                     await asyncio.sleep(polling_interval) # 使用默认间隔
