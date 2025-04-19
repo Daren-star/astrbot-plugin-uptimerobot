@@ -1,0 +1,20 @@
+{
+  "api_key": {
+    "description": "UptimeRobot API Key",
+    "type": "string",
+    "hint": "必需。请在此处填入您的 UptimeRobot API Key (建议使用 Read-Only Key)",
+    "default": ""
+  },
+  "polling_interval": {
+    "description": "轮询间隔 (秒)",
+    "type": "int",
+    "hint": "检查状态更新的间隔时间（秒）。请勿设置过低以免触发 API 速率限制（免费版为 10 次/分钟）。最低强制为 10 秒。",
+    "default": 60
+  },
+  "notification_targets": {
+    "description": "通知目标列表",
+    "type": "list[string]",
+    "hint": "接收状态变更通知的目标会话 ID 列表。格式为 \"平台:ID\"，例如 \"qq:123456789\" 或 \"group:987654321\"。",
+    "default": []
+  }
+} 

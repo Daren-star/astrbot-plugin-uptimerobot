@@ -81,41 +81,46 @@ class UptimeRobotPlugin(Star):
 
 
     def _load_config(self):
-        """加载插件配置"""
+        """加载插件配置 (从 self.config 读取)"""
+        # 假设 AstrBot 在调用 initialize 之前已经加载了 _conf_schema.json
+        # 并将结果（合并了用户设置和默认值）放入了 self.config
+        if not self.config or not isinstance(self.config, dict):
+            logger.error("插件配置 (self.config) 未被正确加载或类型错误，无法读取配置。")
+            self.api_key = None
+            return
+        
         try:
-            astrbot_config = self.context.get_config()
-            plugin_config = astrbot_config.get('plugin', {}).get('uptimerobot', {})
-            self.config = plugin_config # 保存配置
-
-            self.api_key = plugin_config.get('api_key')
+            # 直接从 self.config 读取
+            self.api_key = self.config.get('api_key')
             if not self.api_key:
-                logger.error("UptimeRobot API Key 未在配置中找到或为空。")
+                logger.error("UptimeRobot API Key 未在插件配置中设置或为空。请在 AstrBot UI 中配置此插件。")
                 return # API Key 是必需的
 
             # 加载轮询间隔，提供默认值
             try:
-                interval = plugin_config.get('polling_interval', 60)
+                interval = self.config.get('polling_interval', 60) # Schema 中已定义默认值，此处为备用
                 self.polling_interval = int(interval)
                 if self.polling_interval < 10: # 防止过于频繁的请求
                     logger.warning(f"配置的轮询间隔 {self.polling_interval} 秒过低，强制设置为 10 秒。")
                     self.polling_interval = 10
             except (ValueError, TypeError):
-                logger.warning(f"无效的 polling_interval 配置，使用默认值 60 秒。")
-                self.polling_interval = 60
+                logger.warning(f"无效的 polling_interval 配置值，将使用 schema 中的默认值 60 秒。")
+                self.polling_interval = 60 # 回退到默认值
 
             # 加载通知目标
-            targets = plugin_config.get('notification_targets', [])
+            targets = self.config.get('notification_targets', []) # Schema 中已定义默认值
             if isinstance(targets, list):
+                # 确保列表内都是字符串
                 self.notification_targets = [str(t) for t in targets if isinstance(t, (str, int))]
                 logger.info(f"加载的通知目标: {self.notification_targets}")
             else:
-                logger.warning("配置中的 notification_targets 不是列表，将忽略。")
+                logger.warning("配置中的 notification_targets 不是列表，将使用空列表。")
                 self.notification_targets = []
 
-            logger.info("UptimeRobot 插件配置加载完成。")
+            logger.info("UptimeRobot 插件配置加载完成 (来自 self.config)。")
 
         except Exception as e:
-            logger.error(f"加载 UptimeRobot 插件配置时出错: {e}", exc_info=True)
+            logger.error(f"解析 UptimeRobot 插件配置 (self.config) 时出错: {e}", exc_info=True)
             self.api_key = None # 出错时确保 API Key 无效
 
     # --- 辅助函数将在后续步骤实现 ---

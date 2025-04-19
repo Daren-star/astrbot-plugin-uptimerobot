@@ -21,29 +21,21 @@ requests
 
 ## 配置
 
-在使用此插件之前，您需要在 AstrBot 的主配置文件（通常是 `config.yaml`）中添加以下配置段：
+本插件使用 AstrBot 的插件配置系统。请在 AstrBot 管理面板中进行以下操作：
 
-```yaml
-plugin:
-  uptimerobot:
-    # --- 必需 ---
-    api_key: "YOUR_UPTIMEROBOT_READ_ONLY_API_KEY" # 请在此处填入您的 UptimeRobot API Key (建议使用 Read-Only Key)
+1.  找到已安装的 `uptimerobot_monitor` 插件。
+2.  点击 "插件配置"按钮。
+3.  在配置界面中，您需要填写以下信息：
+    *   **UptimeRobot API Key (api_key):** (必需) 填入您从 UptimeRobot 获取的 API Key。强烈建议使用 **Read-Only API Key**。
+    *   **轮询间隔 (秒) (polling_interval):** (可选) 检查状态更新的间隔时间（秒）。默认为 60 秒。请勿设置过低（建议不低于 10 秒）以免触发 API 速率限制。
+    *   **通知目标列表 (notification_targets):** (可选) 点击 "添加" 按钮可以添加一个或多个接收状态变更通知的目标会话 ID。格式为 `平台:ID`，例如 `qq:123456789` 或 `group:987654321`。具体平台名和 ID 获取方式请参考 AstrBot 的文档或适配器说明。
+4.  点击 "保存"。
 
-    # --- 可选 ---
-    polling_interval: 60  # 检查状态更新的间隔时间（秒）。默认 60 秒。请勿设置过低以免触发 API 速率限制（免费版为 10 次/分钟）。最低强制为 10 秒。
-    notification_targets: # 接收状态变更通知的目标会话 ID 列表。格式为 "平台:ID"。
-      - "qq:123456789"    # 示例：QQ 用户
-      - "group:987654321" # 示例：QQ 群组
-      # - "telegram_user:11223344" # 示例：Telegram 用户
-      # - "telegram_chat:-55667788" # 示例：Telegram 群组
-```
+配置保存后，插件通常会自动重载。如果未生效，您可以尝试手动重载插件。
 
 **重要提示:**
 
-*   `api_key` 是必需的。您可以从 UptimeRobot 网站的 "My Settings" 页面获取。为了安全起见，强烈建议您生成并使用 **Read-Only API Key**，因为此插件的核心功能（查询状态和基于状态变化的通知）不需要修改权限。
-*   `notification_targets` 是一个列表，包含了希望接收状态变化通知的会话的唯一标识符。您需要知道目标用户或群组在相应平台（如 QQ、Telegram 等）上的 ID，并按照 `"平台名:ID"` 的格式填写。具体平台名和 ID 获取方式请参考 AstrBot 的文档或适配器说明。
-
-配置完成后，请重启 AstrBot 或在管理面板中重载此插件以使配置生效。
+*   `api_key` 是必需的。请务必填写。
 
 ## 使用方法
 
