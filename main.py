@@ -64,13 +64,16 @@ class UptimeRobotPlugin(Star):
 
     async def initialize(self):
         """插件初始化，启动轮询任务"""
-        logger.info("UptimeRobot 插件异步初始化... (启动轮询任务)")
+        logger.info("UptimeRobot 插件异步初始化开始...")
+        # 注意：API Key 和其他配置的检查将在轮询循环内部进行
+
+        # 将轮询任务的启动移到方法末尾
+        logger.info(f"配置加载状态 (initialize 末尾): {'已加载' if self.config and isinstance(self.config, dict) else '未加载或类型错误'}")
         if self.polling_task is None or self.polling_task.done():
                 self.polling_task = asyncio.create_task(self._polling_loop())
                 logger.info("轮询任务已创建并启动。")
         else:
                 logger.warning("轮询任务已在运行中，跳过重复创建。")
-        # 注意：API Key 和其他配置的检查将在轮询循环内部进行
 
     # --- 辅助函数将在后续步骤实现 ---
     def _get_status_description(self, status_code: int) -> str:
@@ -368,4 +371,4 @@ class UptimeRobotPlugin(Star):
             except Exception as e:
                 logger.error(f"等待轮询任务取消时发生错误: {e}", exc_info=True)
         else:
-             logger.info("轮询任务不存在或已完成，无需取消。") 
+             logger.info("轮询任务不存在或已完成，无需取消。")
